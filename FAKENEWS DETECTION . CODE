@@ -1,0 +1,39 @@
+import pandas as pd
+import nltk
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.cluster import KMeans
+from nltk.corpus import stopwords
+nltk.download('stopwords')
+df = pd.read_csv('news.csv') 
+print(df.head())
+df.dropna(subset=['text'], inplace=True)
+def clean_text(text):
+    text = text.lower()
+    text = ''.join([char for char in text if char.isalpha() or char.isspace()])
+    return text
+df['cleaned_text'] = df['text'].apply(clean_text)
+stop_words = set(stopwords.words('english'))
+df['cleaned_text'] = df['cleaned_text'].apply(lambda x: ' '.join([word for word in x.split() if word not in stop_words]))
+vectorizer = TfidfVectorizer()
+X = vectorizer.fit_transform(df['cleaned_text'])
+num_clusters = 5 
+kmeans = KMeans(n_clusters=num_clusters, random_state=42)
+kmeans.fit(X)
+df['cluster'] = kmeans.labels_
+for i in range(num_clusters):
+    print(f"\nCluster {i}:")
+    print(df[df['cluster'] == i]['text'].head(5))  
+def predict_article(article):
+    article_cleaned = clean_text(article)
+    article_cleaned = ' '.join([word for word in article_cleaned.split() if word not in stop_words])
+    article_tfidf = vectorizer.transform([article_cleaned])
+    cluster = kmeans.predict(article_tfidf)[0]
+    cluster_size = (df['cluster'] == cluster).sum()
+    if cluster_size < (len(df) / num_clusters): 
+        return cluster, "Fake"
+    else:
+        return cluster, "Not Fake"
+if __name__ == "__main__":
+    user_article = input("Enter a news article: ")
+    cluster_result, fake_status = predict_article(user_article)
+    print(f"The given news article belongs to cluster: {cluster_result} and is likely: {fake_status}")
